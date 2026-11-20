@@ -1,43 +1,44 @@
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    
-    // מנהל מחובר ב-Firebase Auth מקבל גישה מלאה להכל
-    function isAdmin() {
-      return request.auth != null;
-    }
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  addDoc,
+  onSnapshot,
+  query,
+  orderBy,
+  where,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    // הגדרות העגלה והתפריט: פתוח לקריאה לכולם, עריכה רק למנהל
-    match /config/{document=**} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
+export const firebaseConfig = {
+  apiKey: "AIzaSyCiSZP7LGtAq9S63IZt2KOhCK6HizHUbTQ",
+  authDomain: "coofee-337f0.firebaseapp.com",
+  projectId: "coofee-337f0",
+  storageBucket: "coofee-337f0.firebasestorage.app",
+  messagingSenderId: "381039786300",
+  appId: "1:381039786300:web:716f1b0f607635b08c0639",
+  measurementId: "G-2CT6HYFWC8"
+};
 
-    // קודי אימות OTP (מנוהלים ע"י השרת והאימות)
-    match /coffee_otps/{email} {
-      allow read, write: if true;
-    }
+const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app);
 
-    // פרופילי לקוחות
-    match /coffee_users/{email} {
-      allow read, write: if true;
-    }
-
-    // רשימת חסומים: קריאה ללקוח לבדיקת BanGuard, עריכה רק למנהל
-    match /blocked_users/{userId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    // הזמנות והתראות הגעה
-    match /orders/{orderId} {
-      allow read, create, update: if true;
-      allow delete: if isAdmin();
-    }
-
-    match /arrival_alerts/{alertId} {
-      allow read, create: if true;
-      allow delete: if isAdmin();
-    }
-  }
-}
+export {
+  collection,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  addDoc,
+  onSnapshot,
+  query,
+  orderBy,
+  where,
+  serverTimestamp
+};
