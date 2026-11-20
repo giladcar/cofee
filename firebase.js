@@ -1,54 +1,43 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {
-  getFirestore,
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  addDoc,
-  onSnapshot,
-  query,
-  orderBy,
-  where,
-  serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import {
-  getAuth,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // מנהל מחובר ב-Firebase Auth מקבל גישה מלאה להכל
+    function isAdmin() {
+      return request.auth != null;
+    }
 
-// \u05d4\u05d3\u05d1\u05e7 \u05db\u05d0\u05df \u05d0\u05ea \u05e4\u05e8\u05d8\u05d9 \u05d4-Firebase \u05d4\u05d7\u05d3\u05e9 \u05d1\u05e9\u05dc\u05d1 3
-export const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
+    // הגדרות העגלה והתפריט: פתוח לקריאה לכולם, עריכה רק למנהל
+    match /config/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
 
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
-export const auth = getAuth(app);
+    // קודי אימות OTP (מנוהלים ע"י השרת והאימות)
+    match /coffee_otps/{email} {
+      allow read, write: if true;
+    }
 
-export {
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  addDoc,
-  onSnapshot,
-  query,
-  orderBy,
-  where,
-  serverTimestamp,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged
-};
+    // פרופילי לקוחות
+    match /coffee_users/{email} {
+      allow read, write: if true;
+    }
+
+    // רשימת חסומים: קריאה ללקוח לבדיקת BanGuard, עריכה רק למנהל
+    match /blocked_users/{userId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // הזמנות והתראות הגעה
+    match /orders/{orderId} {
+      allow read, create, update: if true;
+      allow delete: if isAdmin();
+    }
+
+    match /arrival_alerts/{alertId} {
+      allow read, create: if true;
+      allow delete: if isAdmin();
+    }
+  }
+}
