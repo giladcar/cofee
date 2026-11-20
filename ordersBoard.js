@@ -1,16 +1,12 @@
 import {
   db,
-  auth,
   collection,
   doc,
   updateDoc,
   deleteDoc,
   onSnapshot,
   query,
-  orderBy,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged
+  orderBy
 } from "./firebase.js";
 
 // \u05de\u05e9\u05ea\u05e0\u05d9 \u05de\u05e6\u05d1
@@ -25,18 +21,22 @@ setInterval(() => {
   const clockEl = document.getElementById("live-clock");
   if (clockEl) {
     const now = new Date();
-    clockEl.textContent = now.toLocaleDateString("he-IL") + " | " + now.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    clockEl.textContent =
+      now.toLocaleDateString("he-IL") +
+      " | " +
+      now.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   }
 }, 1000);
 
-// \u05e0\u05d9\u05d4\u05d5\u05dc \u05d4\u05ea\u05d7\u05d1\u05e8\u05d5\u05ea
+// \u05e0\u05d9\u05d4\u05d5\u05dc \u05d4\u05ea\u05d7\u05d1\u05e8\u05d5\u05ea \u05e2\u05dd \u05e1\u05d9\u05e1\u05de\u05d4 \u05d1\u05dc\u05d1\u05d3
+const ADMIN_PASS = "!@#$%^&*12345678";
 const loginScreen = document.getElementById("login-screen");
 const adminApp = document.getElementById("admin-app");
 const loginForm = document.getElementById("admin-login-form");
 const loginError = document.getElementById("login-error");
 
-onAuthStateChanged(auth, (user) => {
-  if (user) {
+function checkAdminSession() {
+  if (localStorage.getItem("coffee_admin_auth") === "true") {
     loginScreen.classList.add("hidden");
     adminApp.classList.remove("hidden");
     initRealtimeListeners();
@@ -44,24 +44,27 @@ onAuthStateChanged(auth, (user) => {
     loginScreen.classList.remove("hidden");
     adminApp.classList.add("hidden");
   }
-});
+}
 
-loginForm?.addEventListener("submit", async (e) => {
+checkAdminSession();
+
+loginForm?.addEventListener("submit", (e) => {
   e.preventDefault();
   loginError.classList.add("hidden");
-  const email = document.getElementById("admin-email").value.trim();
   const password = document.getElementById("admin-password").value;
-  try {
-    await signInWithEmailAndPassword(auth, email, password);
-  } catch (err) {
-    loginError.textContent = "\u05e9\u05d2\u05d9\u05d0\u05d4 \u05d1\u05d4\u05ea\u05d7\u05d1\u05e8\u05d5\u05ea: \u05d1\u05d3\u05d5\u05e7 \u05d0\u05d9\u05de\u05d9\u05d9\u05dc \u05d5\u05e1\u05d9\u05e1\u05de\u05d4.";
+  if (password === ADMIN_PASS) {
+    localStorage.setItem("coffee_admin_auth", "true");
+    checkAdminSession();
+  } else {
+    loginError.textContent = "\u05e1\u05d9\u05e1\u05de\u05d4 \u05e9\u05d2\u05d5\u05d9\u05d4, \u05e0\u05e1\u05d4 \u05e9\u05d5\u05d1.";
     loginError.classList.remove("hidden");
   }
 });
 
 document.getElementById("logout-btn")?.addEventListener("click", () => {
   if (confirm("\u05dc\u05d4\u05ea\u05e0\u05ea\u05e7 \u05de\u05e4\u05d0\u05e0\u05dc \u05d4\u05e0\u05d9\u05d4\u05d5\u05dc?")) {
-    signOut(auth);
+    localStorage.removeItem("coffee_admin_auth");
+    location.reload();
   }
 });
 
@@ -138,7 +141,9 @@ function initRealtimeListeners() {
     }
 
     container.classList.remove("hidden");
-    list.innerHTML = alerts.map((a) => `
+    list.innerHTML = alerts
+      .map(
+        (a) => `
       <div class="bg-stone-900 border border-amber-500/50 rounded-xl p-3 flex items-center justify-between gap-2">
         <div class="text-xs">
           <span class="font-bold text-amber-300">${escapeHtml(a.firstName || "\u05dc\u05e7\u05d5\u05d7")}</span>
@@ -147,7 +152,9 @@ function initRealtimeListeners() {
         </div>
         <button data-dismiss-alert="${a.id}" class="text-xs bg-stone-800 hover:bg-stone-700 px-2 py-1 rounded text-stone-300 cursor-pointer">\u2713</button>
       </div>
-    `).join("");
+    `
+      )
+      .join("");
 
     list.querySelectorAll("[data-dismiss-alert]").forEach((btn) => {
       btn.addEventListener("click", async () => {
@@ -158,12 +165,12 @@ function initRealtimeListeners() {
 
   // 3. \u05de\u05d5\u05e0\u05d9 \u05d0\u05d9-\u05d0\u05d9\u05e1\u05d5\u05e3 \u05d5\u05d0\u05d9\u05d7\u05d5\u05e8\u05d9\u05dd
   onSnapshot(doc(db, "config", "no_shows"), (snap) => {
-    noShowsMap = snap.exists() ? (snap.data().counts || {}) : {};
+    noShowsMap = snap.exists() ? snap.data().counts || {} : {};
     renderOrders();
   });
 
   onSnapshot(doc(db, "config", "client_lates"), (snap) => {
-    clientLatesMap = snap.exists() ? (snap.data().counts || {}) : {};
+    clientLatesMap = snap.exists() ? snap.data().counts || {} : {};
     renderOrders();
   });
 
@@ -190,8 +197,8 @@ function renderOrders() {
   let filtered = [...allOrders];
 
   if (currentFilter === "active") {
-    filtered = filtered.filter((o) =>
-      o.date === todayStr && ["pending", "preparing", "ready"].includes(o.status)
+    filtered = filtered.filter(
+      (o) => o.date === todayStr && ["pending", "preparing", "ready"].includes(o.status)
     );
   } else if (currentFilter === "today") {
     filtered = filtered.filter((o) => o.date === todayStr);
@@ -204,13 +211,16 @@ function renderOrders() {
     return;
   }
 
-  grid.innerHTML = filtered.map((order) => {
-    const key = order.userEmail || order.phone || "";
-    const noShows = noShowsMap[key] || 0;
-    const lates = clientLatesMap[key] || 0;
+  grid.innerHTML = filtered
+    .map((order) => {
+      const key = order.userEmail || order.phone || "";
+      const noShows = noShowsMap[key] || 0;
+      const lates = clientLatesMap[key] || 0;
 
-    const statusBadge = getStatusBadge(order.status);
-    const itemsHtml = (order.items || []).map((item) => `
+      const statusBadge = getStatusBadge(order.status);
+      const itemsHtml = (order.items || [])
+        .map(
+          (item) => `
       <div class="flex justify-between items-start py-1.5 border-b border-stone-800/80 last:border-0 text-sm">
         <div>
           <span class="font-bold text-amber-300">${item.quantity || 1}x</span>
@@ -220,12 +230,16 @@ function renderOrders() {
         </div>
         <span class="text-stone-300 font-mono">\u20aa${(item.price || 0) * (item.quantity || 1)}</span>
       </div>
-    `).join("");
+    `
+        )
+        .join("");
 
-    const waPhone = formatPhoneForWA(order.phone);
-    const waText = encodeURIComponent(`\u05d4\u05d9\u05d9 ${order.firstName || ""}, \u05d4\u05d4\u05d6\u05de\u05e0\u05d4 \u05e9\u05dc\u05da \u05de\u05e2\u05d2\u05dc\u05ea \u05d4\u05e7\u05e4\u05d4 \u05de\u05d5\u05db\u05e0\u05d4 \u05dc\u05d0\u05d9\u05e1\u05d5\u05e3! \u2615`);
+      const waPhone = formatPhoneForWA(order.phone);
+      const waText = encodeURIComponent(
+        `\u05d4\u05d9\u05d9 ${order.firstName || ""}, \u05d4\u05d4\u05d6\u05de\u05e0\u05d4 \u05e9\u05dc\u05da \u05de\u05e2\u05d2\u05dc\u05ea \u05d4\u05e7\u05e4\u05d4 \u05de\u05d5\u05db\u05e0\u05d4 \u05dc\u05d0\u05d9\u05e1\u05d5\u05e3! \u2615`
+      );
 
-    return `
+      return `
       <div class="bg-stone-900 border ${order.status === "ready" ? "border-emerald-500" : order.status === "preparing" ? "border-amber-500" : "border-stone-800"} rounded-2xl p-4 shadow-lg flex flex-col justify-between">
         <div>
           <!-- \u05db\u05d5\u05ea\u05e8\u05ea \u05db\u05e8\u05d8\u05d9\u05e1 -->
@@ -242,12 +256,16 @@ function renderOrders() {
           </div>
 
           <!-- \u05ea\u05d2\u05d9 \u05d0\u05d6\u05d4\u05e8\u05d4 -->
-          ${(noShows > 0 || lates > 0) ? `
+          ${
+            noShows > 0 || lates > 0
+              ? `
             <div class="flex flex-wrap gap-1.5 mb-3">
               ${noShows > 0 ? `<span class="text-xs bg-red-950 text-red-300 border border-red-800 px-2 py-0.5 rounded-full font-bold">\u26a0\ufe0f \u05dc\u05d0 \u05d0\u05e1\u05e3: ${noShows}</span>` : ""}
               ${lates > 0 ? `<span class="text-xs bg-amber-950 text-amber-300 border border-amber-800 px-2 py-0.5 rounded-full font-bold">\u23f0 \u05d0\u05d9\u05d7\u05e8: ${lates}</span>` : ""}
             </div>
-          ` : ""}
+          `
+              : ""
+          }
 
           <!-- \u05e4\u05d9\u05e8\u05d5\u05d8 \u05e4\u05e8\u05d9\u05d8\u05d9\u05dd -->
           <div class="bg-stone-950/70 rounded-xl p-3 mb-3 border border-stone-800/80">
@@ -263,23 +281,32 @@ function renderOrders() {
         <div class="space-y-2 pt-2">
           ${renderStatusButtons(order)}
           <div class="flex gap-2">
-            ${waPhone ? `
+            ${
+              waPhone
+                ? `
               <a href="https://wa.me/${waPhone}?text=${waText}" target="_blank"
                 class="flex-1 text-center bg-emerald-900/50 hover:bg-emerald-800 border border-emerald-700/60 text-emerald-200 text-xs font-bold py-2 rounded-xl transition">
                 WhatsApp \ud83d\udcac
               </a>
-            ` : ""}
-            ${order.status !== "canceled_by_admin" && order.status !== "completed" ? `
+            `
+                : ""
+            }
+            ${
+              order.status !== "canceled_by_admin" && order.status !== "completed"
+                ? `
               <button data-cancel-order="${order.id}"
                 class="px-3 bg-red-950/60 hover:bg-red-900 border border-red-800/60 text-red-300 text-xs font-bold py-2 rounded-xl transition cursor-pointer">
                 \u05d1\u05d8\u05dc \u05d4\u05d6\u05de\u05e0\u05d4
               </button>
-            ` : ""}
+            `
+                : ""
+            }
           </div>
         </div>
       </div>
     `;
-  }).join("");
+    })
+    .join("");
 
   // \u05d7\u05d9\u05d1\u05d5\u05e8 \u05d0\u05d9\u05e8\u05d5\u05e2\u05d9 \u05dc\u05d7\u05d9\u05e6\u05d4
   grid.querySelectorAll("[data-next-status]").forEach((btn) => {
@@ -292,8 +319,14 @@ function renderOrders() {
 
   grid.querySelectorAll("[data-cancel-order]").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      if (confirm("\u05dc\u05d1\u05d8\u05dc \u05d4\u05d6\u05de\u05e0\u05d4 \u05d6\u05d5? \u05d4\u05dc\u05e7\u05d5\u05d7 \u05d9\u05e7\u05d1\u05dc \u05d4\u05ea\u05e8\u05d0\u05d4.")) {
-        await updateDoc(doc(db, "orders", btn.dataset.cancelOrder), { status: "canceled_by_admin" });
+      if (
+        confirm(
+          "\u05dc\u05d1\u05d8\u05dc \u05d4\u05d6\u05de\u05e0\u05d4 \u05d6\u05d5? \u05d4\u05dc\u05e7\u05d5\u05d7 \u05d9\u05e7\u05d1\u05dc \u05d4\u05ea\u05e8\u05d0\u05d4."
+        )
+      ) {
+        await updateDoc(doc(db, "orders", btn.dataset.cancelOrder), {
+          status: "canceled_by_admin"
+        });
       }
     });
   });
